@@ -5,13 +5,28 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo"
-	"github.com/micro/go-micro/metadata"
 
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
+type metaKey struct{}
+
+// Metadata is our way of representing request headers internally.
+// They're used at the RPC level and translate back and forth
+// from Transport headers.
+type Metadata map[string]string
+
+func MetaFromContext(ctx context.Context) (Metadata, bool) {
+	md, ok := ctx.Value(metaKey{}).(Metadata)
+	return md, ok
+}
+
+func MetaNewContext(ctx context.Context, md Metadata) context.Context {
+	return context.WithValue(ctx, metaKey{}, md)
+}
+
 func StartSpanFromContext(ctx context.Context, name string) (opentracing.Span, context.Context) {
-	md, _ := metadata.FromContext(ctx)
+	md, _ := MetaFromContext(ctx)
 	var sp opentracing.Span
 	tr := opentracing.GlobalTracer()
 	wireContext, err := tr.Extract(opentracing.TextMap, opentracing.TextMapCarrier(md))
@@ -23,12 +38,12 @@ func StartSpanFromContext(ctx context.Context, name string) (opentracing.Span, c
 	if err := sp.Tracer().Inject(sp.Context(), opentracing.TextMap, opentracing.TextMapCarrier(md)); err != nil {
 		return nil, ctx
 	}
-	ctx = metadata.NewContext(ctx, md)
+	ctx = MetaNewContext(ctx, md)
 	return sp, ctx
 }
 
 func StartFollowFromContext(ctx context.Context, name string) (opentracing.Span, context.Context) {
-	md, _ := metadata.FromContext(ctx)
+	md, _ := MetaFromContext(ctx)
 	var sp opentracing.Span
 	tr := opentracing.GlobalTracer()
 	wireContext, err := tr.Extract(opentracing.TextMap, opentracing.TextMapCarrier(md))
@@ -40,7 +55,7 @@ func StartFollowFromContext(ctx context.Context, name string) (opentracing.Span,
 	if err := sp.Tracer().Inject(sp.Context(), opentracing.TextMap, opentracing.TextMapCarrier(md)); err != nil {
 		return nil, ctx
 	}
-	ctx = metadata.NewContext(ctx, md)
+	ctx = MetaNewContext(ctx, md)
 	return sp, ctx
 }
 
@@ -49,7 +64,7 @@ func NewEcho() echo.MiddlewareFunc {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			name := "HTTP " + r.Method + " " + r.URL.Path
-			md, ok := metadata.FromContext(ctx)
+			md, ok := MetaFromContext(ctx)
 			if !ok {
 				md = make(map[string]string)
 			}
@@ -65,7 +80,7 @@ func NewEcho() echo.MiddlewareFunc {
 			if err != nil {
 				return
 			}
-			ctx = metadata.NewContext(ctx, md)
+			ctx = MetaNewContext(ctx, md)
 			//put ctx inside r
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
