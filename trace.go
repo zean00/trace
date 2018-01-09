@@ -24,7 +24,7 @@ func Initialization(name string) (io.Closer, error) {
 	// and enable LogSpan to log every span via configured Logger.
 	cfg := jaegercfg.Configuration{
 		Sampler: &jaegercfg.SamplerConfig{
-			Type:  jaeger.SamplerTypeConst,
+			Type:  jaeger.SamplerTypeRateLimiting,
 			Param: 1,
 		},
 		Reporter: &jaegercfg.ReporterConfig{
@@ -36,7 +36,7 @@ func Initialization(name string) (io.Closer, error) {
 	// Example logger and metrics factory. Use github.com/uber/jaeger-client-go/log
 	// and github.com/uber/jaeger-lib/metrics respectively to bind to real logging and metrics
 	// frameworks.
-	jLogger := jaegerlog.StdLogger
+	jLogger := jaegerlog.NullLogger
 	jMetricsFactory := metrics.NullFactory
 	// metricsFactory := xkit.Wrap("", expvar.NewFactory(10))
 	// Initialize tracer with a logger and a metrics factory
