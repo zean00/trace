@@ -126,3 +126,23 @@ func FromEchoContext(ctx echo.Context, name string) func() {
 	span, _ := opentracing.StartSpanFromContext(ctx.Request().Context(), name)
 	return span.Finish
 }
+
+func Post(ctx context.Context, method, url string, body io.Reader) (int, string) {
+	span := opentracing.SpanFromContext(ctx)
+	if span == nil {
+		span = opentracing.GlobalTracer().StartSpan(url)
+	}
+	defer span.Finish()
+	tracedCtx := opentracing.ContextWithSpan(context.Background(), span)
+	return Call(tracedCtx, method, url, body)
+}
+
+func Get(ctx context.Context, method, url string) (int, string) {
+	span := opentracing.SpanFromContext(ctx)
+	if span == nil {
+		span = opentracing.GlobalTracer().StartSpan(url)
+	}
+	defer span.Finish()
+	tracedCtx := opentracing.ContextWithSpan(context.Background(), span)
+	return TracedCall(tracedCtx, method, url)
+}

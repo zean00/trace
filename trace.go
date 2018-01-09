@@ -3,7 +3,6 @@ package trace
 import (
 	"io"
 	"log"
-	"os"
 
 	jaeger "github.com/uber/jaeger-client-go"
 	jaegercfg "github.com/uber/jaeger-client-go/config"
@@ -13,11 +12,10 @@ import (
 )
 
 //Initialization initialise the Jeager tracer (compatible with opentracing.Tracer interface)
-func Initialization(name string) (io.Closer, error) {
-	var traceAddress string
-	traceAddress, ok := os.LookupEnv("JAEGER_ADDRESS")
-	if !ok {
-		traceAddress = "127.0.0.1"
+func Initialization(name, url string) (io.Closer, error) {
+	traceAddress := "127.0.0.1:5775"
+	if url != "" {
+		traceAddress = url
 	}
 
 	// Sample configuration for testing. Use constant sampling to sample every trace
@@ -29,7 +27,7 @@ func Initialization(name string) (io.Closer, error) {
 		},
 		Reporter: &jaegercfg.ReporterConfig{
 			LogSpans:           true,
-			LocalAgentHostPort: traceAddress + ":5775",
+			LocalAgentHostPort: traceAddress,
 		},
 	}
 
