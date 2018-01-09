@@ -1,0 +1,15 @@
+package: github.com/zean00/trace
+import:
+- package: github.com/labstack/echo
+- package: github.com/opentracing-contrib/go-stdlib
+  subpackages:
+  - nethttp
+- package: github.com/opentracing/opentracing-go
+- package: github.com/uber/jaeger-client-go
+  subpackages:
+  - config
+  - log
+  - rpcmetrics
+- package: github.com/uber/jaeger-lib
+  subpackages:
+  - metrics
