@@ -2,6 +2,7 @@ package trace
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo"
@@ -98,6 +99,7 @@ func NewEcho() echo.MiddlewareFunc {
 func Tracer(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	tr := opentracing.GlobalTracer()
 	if tr == nil {
+		fmt.Println("No global tracer defined, skip...")
 		next(w, r)
 		return
 	}
