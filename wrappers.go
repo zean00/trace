@@ -69,7 +69,8 @@ func PostForm(ctx context.Context, url string, u url.Values) (int, string) {
 
 //Call is an API call with tracing enabled
 func Call(ctx context.Context, method, url string, body io.Reader) (int, string) {
-	tracer := opentracing.SpanFromContext(ctx).Tracer()
+	span := opentracing.SpanFromContext(ctx)
+	tracer := span.Tracer()
 	req, _ := http.NewRequest(method, url, body)
 	req = req.WithContext(ctx)
 	req, ps := nethttp.TraceRequest(tracer, req)
@@ -77,11 +78,13 @@ func Call(ctx context.Context, method, url string, body io.Reader) (int, string)
 	client := &http.Client{Transport: &nethttp.Transport{}}
 	rsp, err := client.Do(req)
 	if err != nil {
+		span.SetTag("error", true)
 		return 500, "something went wrong calling the status"
 	}
 	defer rsp.Body.Close()
 	data, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
+		span.SetTag("error", true)
 		return 500, "something went wrong parsing the body"
 	}
 	return rsp.StatusCode, string(data)
@@ -133,7 +136,7 @@ func Post(ctx context.Context, method, url string, body io.Reader) (int, string)
 		span = opentracing.GlobalTracer().StartSpan(url)
 	}
 	defer span.Finish()
-	tracedCtx := opentracing.ContextWithSpan(context.Background(), span)
+	tracedCtx := opentracing.ContextWithSpan(ctx, span)
 	return Call(tracedCtx, method, url, body)
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo"
 
 	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 )
 
 type metaKey struct{}
@@ -66,27 +67,22 @@ func StartFollowFromContext(ctx context.Context, name string) (opentracing.Span,
 func NewEcho() echo.MiddlewareFunc {
 	inside := func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
 			name := "HTTP " + r.Method + " " + r.URL.Path
-			md, ok := metaFromContext(ctx)
-			if !ok {
-				md = make(map[string]string)
-			}
 			var sp opentracing.Span
 			tr := opentracing.GlobalTracer()
-			wireContext, err := tr.Extract(opentracing.TextMap, opentracing.TextMapCarrier(md))
+			wireContext, err := tr.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
 			if err != nil {
 				sp = tr.StartSpan(name)
 			} else {
 				sp = tr.StartSpan(name, opentracing.ChildOf(wireContext))
 			}
-			err = sp.Tracer().Inject(sp.Context(), opentracing.TextMap, opentracing.TextMapCarrier(md))
+			ext.SpanKind.Set(sp, "handler")
+			sp.SetTag("handler.method", r.Method)
+			err = sp.Tracer().Inject(sp.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
 			if err != nil {
 				return
 			}
-			ctx = metaNewContext(ctx, md)
-			//put ctx inside r
-			r = r.WithContext(ctx)
+			r = r.WithContext(opentracing.ContextWithSpan(r.Context(), sp))
 			next.ServeHTTP(w, r)
 			sp.Finish()
 		}
@@ -103,27 +99,22 @@ func Tracer(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 		next(w, r)
 		return
 	}
-	ctx := r.Context()
 	name := "HTTP " + r.Method + " " + r.URL.Path
-	md, ok := metaFromContext(ctx)
-	if !ok {
-		md = make(map[string]string)
-	}
 	var sp opentracing.Span
 
-	wireContext, err := tr.Extract(opentracing.TextMap, opentracing.TextMapCarrier(md))
+	wireContext, err := tr.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
 	if err != nil {
 		sp = tr.StartSpan(name)
 	} else {
 		sp = tr.StartSpan(name, opentracing.ChildOf(wireContext))
 	}
-	err = sp.Tracer().Inject(sp.Context(), opentracing.TextMap, opentracing.TextMapCarrier(md))
+	ext.SpanKind.Set(sp, "handler")
+	sp.SetTag("handler.method", r.Method)
+	err = sp.Tracer().Inject(sp.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(r.Header))
 	if err != nil {
 		return
 	}
-	ctx = metaNewContext(ctx, md)
-	//put ctx inside r
-	r = r.WithContext(ctx)
+	r = r.WithContext(opentracing.ContextWithSpan(r.Context(), sp))
 	next(w, r)
 	sp.Finish()
 }
