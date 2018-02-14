@@ -15,6 +15,9 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
+//Headers extracted from context
+var Headers = []string{"Content-Type", "Accept"}
+
 //TagSpan is cool for fast tagging a span
 func TagSpan(ctx context.Context, key, value string) error {
 	span := opentracing.SpanFromContext(ctx)
@@ -49,6 +52,7 @@ func TracedCall(ctx context.Context, method, url string) (int, string) {
 	req = req.WithContext(ctx)
 	req, ps := nethttp.TraceRequest(tracer, req)
 	defer ps.Finish()
+	setHeaderFromContext(ctx, req)
 	client := &http.Client{Transport: &nethttp.Transport{}}
 	rsp, err := client.Do(req)
 	if err != nil {
@@ -75,6 +79,7 @@ func Call(ctx context.Context, method, url string, body io.Reader) (int, string)
 	req = req.WithContext(ctx)
 	req, ps := nethttp.TraceRequest(tracer, req)
 	defer ps.Finish()
+	setHeaderFromContext(ctx, req)
 	client := &http.Client{Transport: &nethttp.Transport{}}
 	rsp, err := client.Do(req)
 	if err != nil {
@@ -148,4 +153,13 @@ func Get(ctx context.Context, method, url string) (int, string) {
 	defer span.Finish()
 	tracedCtx := opentracing.ContextWithSpan(context.Background(), span)
 	return TracedCall(tracedCtx, method, url)
+}
+
+func setHeaderFromContext(ctx context.Context, req *http.Request) {
+	for _, h := range Headers {
+		v, ok := ctx.Value(h).(string)
+		if ok && v != "" {
+			req.Header.Set(h, v)
+		}
+	}
 }
